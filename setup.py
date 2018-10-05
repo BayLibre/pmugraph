@@ -39,7 +39,7 @@ setup(
         "Operating System :: GNU/Linux",
         "Programming Language :: Python :: 3.6",
     ],
-    install_requires=['RegiceCommon', 'RegicePMU', 'pyqtgraph', 'PyQt5'],
+    install_requires=['RegiceCommon', 'RegicePMU', 'pyqtgraph'],
     dependency_links=[
         'git+https://github.com/BayLibre/regice-common.git#egg=RegiceCommon',
         'git+https://github.com/BayLibre/regicepmu.git#egg=RegicePMU',
