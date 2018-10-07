@@ -56,8 +56,9 @@ class PMUGraph:
         self.plot.setLabel('bottom', 'Time', 's')
 
         for event in self.events:
+            event_type_name = event.get_event_type().get_name()
             name = event.get_name()
-            color = self.parameters.param(name, 'color').value()
+            color = self.parameters.param(event_type_name, name, 'color').value()
             self.datas[name] = numpy.zeros(10)
             self.curves[name] = self.plot.plot(self.datas[name])
             self.curves[name].setPen(color, width=3)
@@ -129,19 +130,40 @@ class PMUWidget(QWidget):
             PMUGraph(self, event_type)
         self.hsplitter.addWidget(self.vsplitter)
 
-    def addEventParameterTree(self):
+
+    def addEventParameterTree(self, event_type):
         """
             For each perf event, add a parameter to parameter tree.
         """
         children = []
         color = iter(self.colors)
+        events = self.perf.get_events(event_type)
+        for event in events:
+            event_group = {
+                'type': 'group',
+                'name': event.get_name(),
+                'children' : [
+                    { 'type': 'bool', 'name': 'plot', 'value': True },
+                    { 'type': 'color', 'name': 'color', 'value': next(color) },
+                ]
+            }
+            children.append(event_group)
+        return children
+
+    def addEventTypeParameterTree(self):
+        """
+            For each perf event, add a parameter to parameter tree.
+        """
+        children = []
         for event_type in self.events_type:
-            events = self.perf.get_events(event_type)
-            for event in events:
-                children.append(dict(name=event.get_name(), type='group', children=[
-                    dict(name='plot', type='bool', value=True),
-                    dict(name='color', type='color', value=next(color))
-                ]))
+            event_type_obj = self.perf.get_event_type(event_type)
+            event_type_group = {
+                'type': 'group',
+                'name': event_type_obj.get_name(),
+                'children': self.addEventParameterTree(event_type)
+            }
+            children.append(event_type_group)
+
         self.parameters = Parameter.create(name='params', type='group',
                                            children=children)
         self.parameters.sigTreeStateChanged.connect(self.treeChanged)

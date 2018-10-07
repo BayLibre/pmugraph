@@ -62,7 +62,7 @@ def main():
                 device.name, event_type))
 
     win = PMUWidget(perf, events_type)
-    win.addEventParameterTree()
+    win.addEventTypeParameterTree()
     win.addEventGraph()
     win.setWindowTitle('PMUGraph')
     win.show()
