@@ -56,10 +56,11 @@ class PMUGraph:
         self.plot.setLabel('bottom', 'Time', 's')
 
         for event in self.events:
-            color = self.parameters.param(event.name, 'color').value()
-            self.datas[event.name] = numpy.zeros(10)
-            self.curves[event.name] = self.plot.plot(self.datas[event.name])
-            self.curves[event.name].setPen(color, width=3)
+            name = event.get_name()
+            color = self.parameters.param(name, 'color').value()
+            self.datas[name] = numpy.zeros(10)
+            self.curves[name] = self.plot.plot(self.datas[name])
+            self.curves[name].setPen(color, width=3)
             event.enable()
 
         pmuwidget.vsplitter.addWidget(self.plot)
@@ -70,9 +71,10 @@ class PMUGraph:
             Get a performance event and update the graph
         """
         for event in self.events:
-            self.datas[event.name][:-1] = self.datas[event.name][1:]
-            self.datas[event.name][-1] = event.get_value()
-            self.curves[event.name].setData(self.datas[event.name])
+            name = event.get_name()
+            self.datas[name][:-1] = self.datas[name][1:]
+            self.datas[name][-1] = event.get_value()
+            self.curves[name].setData(self.datas[name])
 
     def treeChanged(self):
         """
@@ -136,7 +138,7 @@ class PMUWidget(QWidget):
         for event_type in self.events_type:
             events = self.perf.get_events(event_type)
             for event in events:
-                children.append(dict(name=event.name, type='group', children=[
+                children.append(dict(name=event.get_name(), type='group', children=[
                     dict(name='plot', type='bool', value=True),
                     dict(name='color', type='color', value=next(color))
                 ]))
