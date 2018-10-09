@@ -87,9 +87,11 @@ class PMUGraph:
             tree.
         """
         for event in self.events:
-            plot = self.parameters.param(event.name, 'plot').value()
+            name = event.get_name()
+            event_type_name = event.get_event_type().get_name()
+            color = self.parameters.param(event_type_name, name, 'color').value()
+            plot = self.parameters.param(event_type_name, name, 'plot').value()
             if plot:
-                color = self.parameters.param(event.name, 'color').value()
                 self.curves[event.name].setPen(color, width=3)
                 self.curves[event.name].show()
             else:
