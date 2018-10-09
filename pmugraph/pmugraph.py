@@ -48,11 +48,12 @@ class PMUGraph:
         self.curves = {}
         self.events = self.perf.get_events(event_type)
 
-        if self.events[0].has_range():
-            y_min, y_max = self.events[0].get_range()
+        event_type_obj = self.perf.get_event_type(event_type)
+        if event_type_obj.has_limits():
+            y_min, y_max = event_type_obj.get_limits()
             self.plot.setYRange(y_min, y_max)
-        self.plot.setLabel('left', self.events[0].get_name(),
-                           self.events[0].get_unit())
+        self.plot.setLabel('left', event_type_obj.get_name(),
+                           event_type_obj.get_unit())
         self.plot.setLabel('bottom', 'Time', 's')
 
         for event in self.events:
