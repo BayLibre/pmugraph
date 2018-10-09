@@ -23,13 +23,46 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import numpy
+from time import time
 
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import QHBoxLayout, QApplication, QWidget, QSplitter
 from pyqtgraph import setConfigOption, PlotWidget
 from pyqtgraph.parametertree import Parameter, ParameterTree
 from regicepmu.perf import Perf
+
+class PMUData:
+    """
+        A class to collect PMU data.
+
+        This could be used by one or more graphs to display the data.
+        :param event: The event to collect data from
+    """
+    def __init__(self, event, window_size):
+        self.graphs = []
+        self.data = [0] * window_size
+        self.time = [0] * window_size
+        self.event = event
+        self.event.enable()
+        self.tstart = time()
+
+    def add_graph(self, graph):
+        """
+            Add a graph to update on event update.
+
+            :param graph: The PMUGraph object that will display data
+        """
+        graph.init(self.event, self.time, self.data)
+        self.graphs.append(graph)
+
+    def update(self):
+        """
+            Get a performance event and update the graph
+        """
+        self.data.append(self.event.get_value())
+        self.time.append(time() - self.tstart)
+        for graph in self.graphs:
+            graph.update(self.event, self.time, self.data)
 
 class PMUGraph:
     """
@@ -39,12 +72,12 @@ class PMUGraph:
         :param pmuwidget: A PMUWidget object
         :param event_type: The type of performance event to display
     """
-    def __init__(self, pmuwidget, event_type):
+    def __init__(self, pmuwidget, event_type, window_size):
         self.plot = PlotWidget()
         self.perf = pmuwidget.perf
         self.parameters = pmuwidget.parameters
+        self.window_size = window_size
 
-        self.datas = {}
         self.curves = {}
         self.events = self.perf.get_events(event_type)
 
@@ -56,27 +89,39 @@ class PMUGraph:
                            event_type_obj.get_unit())
         self.plot.setLabel('bottom', 'Time', 's')
 
-        for event in self.events:
-            event_type_name = event.get_event_type().get_name()
-            name = event.get_name()
-            color = self.parameters.param(event_type_name, name, 'color').value()
-            self.datas[name] = numpy.zeros(10)
-            self.curves[name] = self.plot.plot(self.datas[name])
-            self.curves[name].setPen(color, width=3)
-            event.enable()
-
         pmuwidget.vsplitter.addWidget(self.plot)
         pmuwidget.graphs.append(self)
 
-    def update(self):
+    def init(self, event, data_time, data):
         """
-            Get a performance event and update the graph
+            Initialize the graph
+
+            :param event: The event to display
+            :param data: The event's data
         """
-        for event in self.events:
-            name = event.get_name()
-            self.datas[name][:-1] = self.datas[name][1:]
-            self.datas[name][-1] = event.get_value()
-            self.curves[name].setData(self.datas[name])
+        name = event.get_name()
+        event_type_name = event.get_event_type().get_name()
+        color = self.parameters.param(event_type_name, name, 'color').value()
+        self.curves[name] = self.plot.plot(data_time, data)
+        self.curves[name].setPen(color, width=3)
+
+    def update(self, event, data_time, data):
+        """
+            Update the graph
+
+            :param event: The event to display
+            :param data: The event's data
+        """
+        name = event.get_name()
+        if self.window_size is None:
+            self.curves[name].setData(data_time, data)
+        else:
+            new_data_time = []
+            dt0 = data_time[-self.window_size]
+            for dt in data_time[-self.window_size:]:
+                new_data_time.append(dt-dt0)
+            self.curves[name].setData(new_data_time,
+                                      data[-self.window_size:])
 
     def treeChanged(self):
         """
@@ -104,10 +149,11 @@ class PMUWidget(QWidget):
         :param perf: A Perf object
         :param events_type: A list of perf event type to display
     """
-    def __init__(self, perf, events_type):
+    def __init__(self, perf, events_type, window_size):
         super(PMUWidget, self).__init__()
         self.perf = perf
         self.events_type = events_type
+        self.window_size = window_size
 
         self.tree = ParameterTree(showHeader=False)
         self.parameters = None
@@ -122,6 +168,7 @@ class PMUWidget(QWidget):
         box.addWidget(self.hsplitter)
 
         self.graphs = []
+        self.data = []
 
     def addEventGraph(self):
         """
@@ -130,9 +177,13 @@ class PMUWidget(QWidget):
         setConfigOption('foreground', 'k')
         setConfigOption('background', 'w')
         for event_type in self.events_type:
-            PMUGraph(self, event_type)
-        self.hsplitter.addWidget(self.vsplitter)
+            graph_window = PMUGraph(self, event_type, self.window_size)
+            for event in self.perf.get_events(event_type):
+                data = PMUData(event, self.window_size)
+                data.add_graph(graph_window)
+                self.data.append(data)
 
+        self.hsplitter.addWidget(self.vsplitter)
 
     def addEventParameterTree(self, event_type):
         """
@@ -177,8 +228,8 @@ class PMUWidget(QWidget):
         """
             Update the graphs
         """
-        for graph in self.graphs:
-            graph.update()
+        for data in self.data:
+            data.update()
 
     def treeChanged(self):
         """

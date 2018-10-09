@@ -44,6 +44,9 @@ def main():
     args = results[1]
     perf = Perf(device)
 
+    sample_rate = 10
+    time_size = 10
+
     app = QApplication(sys.argv)
 
     events_type = []
@@ -61,7 +64,7 @@ def main():
             print('{} doesn\'t support perf event of type {}'.format(
                 device.name, event_type))
 
-    win = PMUWidget(perf, events_type)
+    win = PMUWidget(perf, events_type, sample_rate * time_size)
     win.addEventTypeParameterTree()
     win.addEventGraph()
     win.setWindowTitle('PMUGraph')
@@ -69,7 +72,7 @@ def main():
 
     timer = QTimer()
     timer.timeout.connect(win.update)
-    timer.start(1000)
+    timer.start(1000 / sample_rate)
 
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QApplication.instance().exec_()
