@@ -161,6 +161,7 @@ class PMUWidget(QWidget):
             "#0088FF", "#FF5500", "#449900", "#AA00AA",
             "#4444FF", "#994400", "#99AA00", "#990000",
         ]
+        self.color_iter = iter(self.colors)
 
         self.vsplitter = QSplitter(Qt.Vertical)
         self.hsplitter = QSplitter(Qt.Horizontal)
@@ -187,22 +188,30 @@ class PMUWidget(QWidget):
 
         self.hsplitter.addWidget(self.vsplitter)
 
-    def addEventParameterTree(self, event_type):
+    def addEventParameterTree(self, event):
         """
             For each perf event, add a parameter to parameter tree.
         """
         children = []
-        color = iter(self.colors)
+        color = next(self.color_iter)
+        event_group = {
+            'type': 'group',
+            'name': event.get_name(),
+            'children' : [
+                { 'type': 'bool', 'name': 'plot', 'value': True },
+                { 'type': 'color', 'name': 'color', 'value': color },
+            ]
+        }
+        return event_group
+
+    def addEventsParameterTree(self, event_type):
+        """
+            For each perf event, add a parameter to parameter tree.
+        """
+        children = []
         events = self.perf.get_events(event_type)
         for event in events:
-            event_group = {
-                'type': 'group',
-                'name': event.get_name(),
-                'children' : [
-                    { 'type': 'bool', 'name': 'plot', 'value': True },
-                    { 'type': 'color', 'name': 'color', 'value': next(color) },
-                ]
-            }
+            event_group = self.addEventParameterTree(event)
             children.append(event_group)
         return children
 
@@ -216,7 +225,7 @@ class PMUWidget(QWidget):
             event_type_group = {
                 'type': 'group',
                 'name': event_type_obj.get_name(),
-                'children': self.addEventParameterTree(event_type)
+                'children': self.addEventsParameterTree(event_type)
             }
             children.append(event_type_group)
 
