@@ -178,9 +178,11 @@ class PMUWidget(QWidget):
         setConfigOption('background', 'w')
         for event_type in self.events_type:
             graph_window = PMUGraph(self, event_type, self.window_size)
+            graph_full = PMUGraph(self, event_type, None)
             for event in self.perf.get_events(event_type):
                 data = PMUData(event, self.window_size)
                 data.add_graph(graph_window)
+                data.add_graph(graph_full)
                 self.data.append(data)
 
         self.hsplitter.addWidget(self.vsplitter)
