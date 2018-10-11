@@ -64,6 +64,12 @@ class PMUData:
         for graph in self.graphs:
             graph.update(self.event, self.time, self.data)
 
+    def disable(self):
+        """
+            Disable the PMU counter
+        """
+        self.event.disable()
+
 class PMUGraph:
     """
         A class to display one or more performance graph,
@@ -248,3 +254,13 @@ class PMUWidget(QWidget):
         """
         for graph in self.graphs:
             graph.treeChanged()
+
+
+    def closeEvent(self,event):
+        """
+            Disable the PMU counter and stop the PMU on exit
+        """
+        _data = self.data
+        self.data = []
+        for data in _data:
+            data.disable()
