@@ -26,7 +26,7 @@
 from time import time
 
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtWidgets import QHBoxLayout, QApplication, QWidget, QSplitter
+from PyQt5.QtWidgets import QHBoxLayout, QApplication, QWidget, QGridLayout
 from pyqtgraph import setConfigOption, PlotWidget
 from pyqtgraph.parametertree import Parameter, ParameterTree
 from regicepmu.perf import Perf
@@ -85,7 +85,7 @@ class PMUGraph:
         :param pmuwidget: A PMUWidget object
         :param event_type: The type of performance event to display
     """
-    def __init__(self, pmuwidget, event_type, window_size):
+    def __init__(self, pmuwidget, event_type, window_size, col, row):
         self.plot = PlotWidget()
         self.perf = pmuwidget.perf
         self.parameters = pmuwidget.parameters
@@ -100,7 +100,7 @@ class PMUGraph:
                            event_type.get_unit())
         self.plot.setLabel('bottom', 'Time', 's')
 
-        pmuwidget.vsplitter.addWidget(self.plot)
+        pmuwidget.qbox.addWidget(self.plot, col, row)
         if (window_size):
             pmuwidget.graphs[event_type] = self
         else:
@@ -177,10 +177,8 @@ class PMUWidget(QWidget):
         ]
         self.color_iter = iter(self.colors)
 
-        self.vsplitter = QSplitter(Qt.Vertical)
-        self.hsplitter = QSplitter(Qt.Horizontal)
-        box = QHBoxLayout(self)
-        box.addWidget(self.hsplitter)
+        self.qbox = QGridLayout()
+        self.hbox = QHBoxLayout(self)
 
         self.graphs = {}
         self.graphs_full = {}
@@ -190,13 +188,15 @@ class PMUWidget(QWidget):
         """
             For each type of perf event, add a graph
         """
+        i = 0
         setConfigOption('foreground', 'k')
         setConfigOption('background', 'w')
         for event in self.events:
             event_type = event.get_event_type()
             if event_type not in self.graphs:
-                graph_window = PMUGraph(self, event_type, self.window_size)
-                graph_full = PMUGraph(self, event_type, None)
+                graph_window = PMUGraph(self, event_type, self.window_size, i, 0)
+                graph_full = PMUGraph(self, event_type, None, i, 1)
+                i += 1
             else:
                 graph_window = self.graphs[event_type]
                 graph_full = self.graphs_full[event_type]
@@ -204,8 +204,7 @@ class PMUWidget(QWidget):
             data.add_graph(graph_window)
             data.add_graph(graph_full)
             self.data.append(data)
-
-        self.hsplitter.addWidget(self.vsplitter)
+        self.hbox.addLayout(self.qbox)
 
     def addEventParameterTree(self, event):
         """
@@ -253,7 +252,7 @@ class PMUWidget(QWidget):
                                            children=children)
         self.parameters.sigTreeStateChanged.connect(self.treeChanged)
         self.tree.setParameters(self.parameters, showTop=False)
-        self.hsplitter.addWidget(self.tree)
+        self.hbox.addWidget(self.tree)
 
     def update(self):
         """
