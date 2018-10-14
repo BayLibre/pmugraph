@@ -33,7 +33,7 @@ from regicepmu.perf import Perf
 from pmugraph.pmugraph import PMUWidget
 
 def main():
-    plugins = []
+    plugins = ['regicepmu']
     parser = init_argument_parser(plugins)
     parser.add_argument('--cpu-load', action='store_true',
                         help='Display the cpu load')
@@ -41,30 +41,22 @@ def main():
                         help='Display the memory load')
     results = process_arguments(parser, plugins)
     device = results[0]
-    args = results[1]
     perf = Perf(device)
+
+    parser = init_argument_parser(plugins, device)
+    results = process_arguments(parser, plugins, device)
+    args = results[1]
 
     sample_rate = 10
     time_size = 10
 
     app = QApplication(sys.argv)
 
-    events_type = []
-    if args.cpu_load:
-        events_type.append(Perf.CPU_LOAD)
-    if args.memory_load:
-        events_type.append(Perf.MEMORY_LOAD)
-
-    if not events_type:
+    if not args.events:
         print('A least one perf event have to be selected.')
         sys.exit(1)
-    for event_type in events_type:
-        events = perf.get_events()
-        if not events:
-            print('{} doesn\'t support perf event of type {}'.format(
-                device.name, event_type))
 
-    win = PMUWidget(perf, events_type, sample_rate * time_size)
+    win = PMUWidget(perf, args.events, sample_rate * time_size)
     win.addEventTypeParameterTree()
     win.addEventGraph()
     win.setWindowTitle('PMUGraph')

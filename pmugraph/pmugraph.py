@@ -70,6 +70,13 @@ class PMUData:
         """
         self.event.disable()
 
+    def treeChanged(self):
+        """
+            Update graph option when a parameter has been changed
+        """
+        for graph in self.graphs:
+            graph.treeChanged(self.event)
+
 class PMUGraph:
     """
         A class to display one or more performance graph,
@@ -85,18 +92,19 @@ class PMUGraph:
         self.window_size = window_size
 
         self.curves = {}
-        self.events = self.perf.get_events(event_type)
 
-        event_type_obj = self.perf.get_event_type(event_type)
-        if event_type_obj.has_limits():
-            y_min, y_max = event_type_obj.get_limits()
+        if event_type.has_limits():
+            y_min, y_max = event_type.get_limits()
             self.plot.setYRange(y_min, y_max)
-        self.plot.setLabel('left', event_type_obj.get_name(),
-                           event_type_obj.get_unit())
+        self.plot.setLabel('left', event_type.get_name(),
+                           event_type.get_unit())
         self.plot.setLabel('bottom', 'Time', 's')
 
         pmuwidget.vsplitter.addWidget(self.plot)
-        pmuwidget.graphs.append(self)
+        if (window_size):
+            pmuwidget.graphs[event_type] = self
+        else:
+            pmuwidget.graphs_full[event_type] = self
 
     def init(self, event, data_time, data):
         """
@@ -129,37 +137,37 @@ class PMUGraph:
             self.curves[name].setData(new_data_time,
                                       data[-self.window_size:])
 
-    def treeChanged(self):
+    def treeChanged(self, event):
         """
             Update graph option when a parameter has been changed
 
             This updates the color, and show or hide the graph
             when one of this option has been changed in the parameter
             tree.
+            :param event:
         """
-        for event in self.events:
-            name = event.get_name()
-            event_type_name = event.get_event_type().get_name()
-            color = self.parameters.param(event_type_name, name, 'color').value()
-            plot = self.parameters.param(event_type_name, name, 'plot').value()
-            if plot:
-                self.curves[event.name].setPen(color, width=3)
-                self.curves[event.name].show()
-            else:
-                self.curves[event.name].hide()
+        name = event.get_name()
+        event_type_name = event.get_event_type().get_name()
+        color = self.parameters.param(event_type_name, name, 'color').value()
+        plot = self.parameters.param(event_type_name, name, 'plot').value()
+        if plot:
+            self.curves[event.get_name()].setPen(color, width=3)
+            self.curves[event.get_name()].show()
+        else:
+            self.curves[event.get_name()].hide()
 
 class PMUWidget(QWidget):
     """
         A widget to display the parameter tree and the graphs
 
         :param perf: A Perf object
-        :param events_type: A list of perf event type to display
+        :param events: A list of perf event type to display
     """
-    def __init__(self, perf, events_type, window_size):
+    def __init__(self, perf, events, window_size):
         super(PMUWidget, self).__init__()
         self.perf = perf
-        self.events_type = events_type
         self.window_size = window_size
+        self.events = events
 
         self.tree = ParameterTree(showHeader=False)
         self.parameters = None
@@ -174,7 +182,8 @@ class PMUWidget(QWidget):
         box = QHBoxLayout(self)
         box.addWidget(self.hsplitter)
 
-        self.graphs = []
+        self.graphs = {}
+        self.graphs_full = {}
         self.data = []
 
     def addEventGraph(self):
@@ -183,14 +192,18 @@ class PMUWidget(QWidget):
         """
         setConfigOption('foreground', 'k')
         setConfigOption('background', 'w')
-        for event_type in self.events_type:
-            graph_window = PMUGraph(self, event_type, self.window_size)
-            graph_full = PMUGraph(self, event_type, None)
-            for event in self.perf.get_events(event_type):
-                data = PMUData(event, self.window_size)
-                data.add_graph(graph_window)
-                data.add_graph(graph_full)
-                self.data.append(data)
+        for event in self.events:
+            event_type = event.get_event_type()
+            if event_type not in self.graphs:
+                graph_window = PMUGraph(self, event_type, self.window_size)
+                graph_full = PMUGraph(self, event_type, None)
+            else:
+                graph_window = self.graphs[event_type]
+                graph_full = self.graphs_full[event_type]
+            data = PMUData(event, self.window_size)
+            data.add_graph(graph_window)
+            data.add_graph(graph_full)
+            self.data.append(data)
 
         self.hsplitter.addWidget(self.vsplitter)
 
@@ -215,8 +228,9 @@ class PMUWidget(QWidget):
             For each perf event, add a parameter to parameter tree.
         """
         children = []
-        events = self.perf.get_events(event_type)
-        for event in events:
+        for event in self.events:
+            if event.get_event_type() is not event_type:
+                continue
             event_group = self.addEventParameterTree(event)
             children.append(event_group)
         return children
@@ -226,11 +240,11 @@ class PMUWidget(QWidget):
             For each perf event, add a parameter to parameter tree.
         """
         children = []
-        for event_type in self.events_type:
-            event_type_obj = self.perf.get_event_type(event_type)
+        events_type = [event.get_event_type() for event in self.events]
+        for event_type in set(events_type):
             event_type_group = {
                 'type': 'group',
-                'name': event_type_obj.get_name(),
+                'name': event_type.get_name(),
                 'children': self.addEventsParameterTree(event_type)
             }
             children.append(event_type_group)
@@ -252,9 +266,8 @@ class PMUWidget(QWidget):
         """
             Called when a value have changed
         """
-        for graph in self.graphs:
-            graph.treeChanged()
-
+        for data in self.data:
+            data.treeChanged()
 
     def closeEvent(self,event):
         """
